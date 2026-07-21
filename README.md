@@ -1,4 +1,4 @@
-# 工业场景OR-Rag效果验证 MVP
+# 工业场景og-rag效果验证 MVP
 
 验证目标：**混合检索架构（hybrid-rag）在工业场景下对 Agent 问答效果的提升**。
 
