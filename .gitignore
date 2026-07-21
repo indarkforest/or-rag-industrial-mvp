@@ -13,6 +13,7 @@ data/kg.sqlite
 data/kg.sqlite-wal
 data/kg.sqlite-shm
 eval_report.md
+logs/
 
 # 环境变量
 .env

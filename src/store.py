@@ -4,6 +4,10 @@ import sqlite3
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from loguru import logger
+
+from .models import Edge, Node
+from .exceptions import StoreError
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
@@ -47,16 +51,25 @@ def _from_blob(blob: bytes) -> np.ndarray:
 
 class GraphStore:
     def __init__(self, db_path: str):
-        self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
-        self.conn.execute("PRAGMA journal_mode=WAL")
-        self.conn.execute("PRAGMA busy_timeout=30000")
-        self.conn.executescript(_SCHEMA)
-        self.conn.commit()
+        try:
+            self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA busy_timeout=30000")
+            self.conn.executescript(_SCHEMA)
+            self.conn.commit()
+        except sqlite3.Error as exc:
+            raise StoreError(str(exc), f"数据库打开失败: {db_path}")
 
     def reset(self):
-        for table in ("nodes", "edges", "chunks", "facts", "live_data"):
-            self.conn.execute(f"DELETE FROM {table}")
-        self.conn.commit()
+        try:
+            for table in ("nodes", "edges", "chunks", "facts", "live_data"):
+                try:
+                    self.conn.execute(f"DELETE FROM {table}")
+                except sqlite3.OperationalError:
+                    pass
+            self.conn.commit()
+        except sqlite3.Error as exc:
+            raise StoreError(str(exc), "数据库重置失败，可能被其他进程锁定")
 
     # ---------- 写入 ----------
     def add_node(self, node_id: str, node_type: str, label: str = "", properties: Optional[dict] = None):
@@ -108,7 +121,8 @@ class GraphStore:
         ).fetchone()
         if not row:
             return None
-        return {"id": row[0], "type": row[1], "label": row[2], "properties": json.loads(row[3] or "{}")}
+        node = Node(id=row[0], type=row[1], label=row[2], properties=json.loads(row[3] or "{}"))
+        return node.model_dump()
 
     def neighbors(self, node_ids: List[str], hops: int = 1) -> List[Tuple[str, str, str]]:
         """返回指定节点集合 N 跳内的所有边 (src, rel, dst)。"""
@@ -143,6 +157,6 @@ class GraphStore:
     def all_nodes(self) -> List[dict]:
         rows = self.conn.execute("SELECT id, type, label, properties FROM nodes").fetchall()
         return [
-            {"id": r[0], "type": r[1], "label": r[2], "properties": json.loads(r[3] or "{}")}
+            Node(id=r[0], type=r[1], label=r[2], properties=json.loads(r[3] or "{}")).model_dump()
             for r in rows
         ]

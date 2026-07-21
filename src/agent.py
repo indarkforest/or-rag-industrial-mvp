@@ -2,6 +2,7 @@
 from typing import Dict, List
 
 from .llm import LLMClient
+from .models import QAResult
 from .retriever import BaseRetriever
 
 _ANSWER_SYSTEM = """你是工业智能助手，服务于化工装置的运行与工艺人员。
@@ -24,9 +25,10 @@ class QAAgent:
         context_text = "\n\n".join(contexts) if contexts else "（未检索到任何上下文）"
         user = f"## 上下文\n{context_text}\n\n## 问题\n{question}"
         answer = self.llm.chat(_ANSWER_SYSTEM, user)
-        return {
-            "retriever": self.retriever.name,
-            "question": question,
-            "contexts": contexts,
-            "answer": answer,
-        }
+        result = QAResult(
+            retriever=self.retriever.name,
+            question=question,
+            contexts=contexts,
+            answer=answer,
+        )
+        return result.model_dump()

@@ -1,13 +1,12 @@
 """对照评估：同一问题集分别用 naive-RAG 与 OG-RAG 回答，LLM-as-judge 打分。"""
-import logging
 from typing import Dict, List
 
 import yaml
+from loguru import logger
 
 from .agent import QAAgent
 from .llm import LLMClient
-
-logger = logging.getLogger(__name__)
+from .models import EvalResult, EvalRow, EvalScore
 
 _JUDGE_SYSTEM = """你是严格的评估员。根据参考答案要点，对候选回答打分。
 
@@ -25,28 +24,28 @@ def load_questions(path: str) -> List[dict]:
         return yaml.safe_load(f)["questions"]
 
 
-def judge(llm: LLMClient, question: str, reference: str, answer: str) -> dict:
+def judge(llm: LLMClient, question: str, reference: str, answer: str) -> EvalScore:
     user = f"## 问题\n{question}\n\n## 参考答案要点\n{reference}\n\n## 候选回答\n{answer}"
     try:
         result = llm.chat_json(_JUDGE_SYSTEM, user)
         if not isinstance(result, dict):
-            logger.warning("评分 LLM 返回非 dict: %s", type(result).__name__)
-            return {"correctness": 0, "completeness": 0, "faithfulness": 0, "comment": "评分格式异常"}
-        return {
-            "correctness": float(result.get("correctness", 0)),
-            "completeness": float(result.get("completeness", 0)),
-            "faithfulness": float(result.get("faithfulness", 0)),
-            "comment": result.get("comment", ""),
-        }
+            logger.warning(f"评分 LLM 返回非 dict: {type(result).__name__}")
+            return EvalScore(comment="评分格式异常")
+        return EvalScore(
+            correctness=float(result.get("correctness", 0)),
+            completeness=float(result.get("completeness", 0)),
+            faithfulness=float(result.get("faithfulness", 0)),
+            comment=result.get("comment", ""),
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.error("评分失败: %s", exc)
-        return {"correctness": 0, "completeness": 0, "faithfulness": 0, "comment": f"评分失败: {exc}"}
+        logger.error(f"评分失败: {exc}")
+        return EvalScore(comment=f"评分失败: {exc}")
 
 
 def run_eval(cfg: dict, llm: LLMClient, agents: Dict[str, QAAgent], progress_cb=None) -> dict:
     """返回 {"rows": [...], "summary": {retriever: 平均分}}。"""
     questions = load_questions(cfg["data"]["questions_path"])
-    rows = []
+    rows: List[EvalRow] = []
     for q in questions:
         for name, agent in agents.items():
             msg = f"[{q['id']}] {name} 回答中..."
@@ -55,27 +54,28 @@ def run_eval(cfg: dict, llm: LLMClient, agents: Dict[str, QAAgent], progress_cb=
                 progress_cb(msg)
             result = agent.answer(q["question"])
             scores = judge(llm, q["question"], q["reference"], result["answer"])
-            rows.append(
-                {
-                    "id": q["id"],
-                    "type": q.get("type", ""),
-                    "question": q["question"],
-                    "retriever": name,
-                    "answer": result["answer"],
-                    **scores,
-                }
-            )
+            rows.append(EvalRow(
+                id=q["id"],
+                type=q.get("type", ""),
+                question=q["question"],
+                retriever=name,
+                answer=result["answer"],
+                correctness=scores.correctness,
+                completeness=scores.completeness,
+                faithfulness=scores.faithfulness,
+                comment=scores.comment,
+            ))
 
     summary = {}
     for name in agents:
-        subset = [r for r in rows if r["retriever"] == name]
+        subset = [r for r in rows if r.retriever == name]
         n = max(len(subset), 1)
         summary[name] = {
-            "correctness": round(sum(r["correctness"] for r in subset) / n, 2),
-            "completeness": round(sum(r["completeness"] for r in subset) / n, 2),
-            "faithfulness": round(sum(r["faithfulness"] for r in subset) / n, 2),
+            "correctness": round(sum(r.correctness for r in subset) / n, 2),
+            "completeness": round(sum(r.completeness for r in subset) / n, 2),
+            "faithfulness": round(sum(r.faithfulness for r in subset) / n, 2),
         }
-    return {"rows": rows, "summary": summary}
+    return {"rows": [r.model_dump() for r in rows], "summary": summary}
 
 
 def format_report(result: dict) -> str:

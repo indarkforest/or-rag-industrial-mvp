@@ -3,18 +3,39 @@
 """
 import glob
 import os
+import sys
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from loguru import logger
 
 from src.agent import QAAgent
 from src.config import load_config
 from src.evaluate import format_report, run_eval
+from src.exceptions import AppError
 from src.kg_builder import KGBuilder
 from src.live_data import LiveDataProvider
 from src.llm import EmbeddingClient, LLMClient
 from src.retriever import build_retrievers
 from src.store import GraphStore
+
+# ── 日志配置 ──
+_LOG_DIR = Path(__file__).resolve().parent / "logs"
+try:
+    _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    logger.remove()
+    logger.add(sys.stderr, level="INFO",
+               format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+                      "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+               colorize=True)
+    logger.add(str(_LOG_DIR / "app_{time:YYYY-MM-DD}.log"), level="DEBUG",
+               format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}",
+               rotation="00:00", retention="7 days", encoding="utf-8")
+except Exception as e:
+    print(f"Logger init failed: {e}", file=sys.stderr)
+
+logger.info("Streamlit app starting...")
 
 st.set_page_config(page_title="OG-RAG 工业验证 MVP", page_icon="🏭", layout="wide")
 
@@ -65,7 +86,12 @@ def _get_ctx():
         store = GraphStore(cfg["data"]["db_path"])
         live_data = LiveDataProvider(cfg["data"]["db_path"])
         return cfg, llm, embedder, store, live_data
-    except Exception:
+    except AppError as exc:
+        st.error(f"⚠️ {exc.user_message}")
+        return None, None, None, None, None
+    except Exception as exc:
+        logger.error("初始化失败: %s", exc)
+        st.error(f"⚠️ 初始化失败: {exc}")
         return None, None, None, None, None
 
 

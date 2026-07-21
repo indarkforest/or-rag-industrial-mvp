@@ -1,12 +1,11 @@
 """实时数据提供者：模拟工业实时数据 + 旋转门压缩 + 注入检索上下文。"""
 import json
-import logging
 import random
 import sqlite3
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 _LIVE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS live_data (

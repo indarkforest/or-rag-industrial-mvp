@@ -6,16 +6,15 @@
 """
 import glob
 import json
-import logging
 import os
 from collections import defaultdict
 from typing import List
 
+from loguru import logger
+
 from .llm import EmbeddingClient, LLMClient
 from .ontology import Ontology
 from .store import GraphStore
-
-logger = logging.getLogger(__name__)
 
 
 def _normalize_extract_result(result):
@@ -130,7 +129,7 @@ class KGBuilder:
                 try:
                     result = self.llm.chat_json(system_prompt, f"文档片段：\n\n{chunk}")
                 except Exception as exc:  # noqa: BLE001
-                    logger.error("片段抽取失败，跳过: %s", exc)
+                    logger.error(f"片段抽取失败，跳过: {exc}")
                     continue
                 result = _normalize_extract_result(result)
                 if not result:

@@ -1,15 +1,15 @@
 """LLM 与 Embedding 客户端。LLM 基于 OpenAI 兼容接口，Embedding 使用 MiniMax 原生 API。"""
 import json
-import logging
 import re
 from typing import List
 
 import numpy as np
 import requests
+from loguru import logger
 from openai import OpenAI
 from sklearn.feature_extraction.text import HashingVectorizer
 
-logger = logging.getLogger(__name__)
+from .exceptions import EmbeddingError, LLMError
 
 
 class LLMClient:
@@ -20,15 +20,18 @@ class LLMClient:
         self.temperature = m.get("temperature", 0.1)
 
     def chat(self, system: str, user: str) -> str:
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            temperature=self.temperature,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        )
-        return resp.choices[0].message.content or ""
+        try:
+            resp = self.client.chat.completions.create(
+                model=self.model,
+                temperature=self.temperature,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as exc:
+            raise LLMError(str(exc), f"LLM 调用失败（{self.model}）: {exc}")
 
     def chat_json(self, system: str, user: str):
         """要求 LLM 返回 JSON，并做容错解析（剥离 markdown 代码块等）。
@@ -107,7 +110,7 @@ class EmbeddingClient:
             try:
                 return self._api_embed(texts, embed_type="db")
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Embedding API 调用失败，降级为本地 hashing 向量: %s", exc)
+                logger.warning(f"Embedding API 调用失败，降级为本地 hashing 向量: {exc}")
                 self._api_failed = True
         return self._hasher.transform(texts).toarray().astype(np.float32)
 
@@ -120,7 +123,7 @@ class EmbeddingClient:
             try:
                 return self._api_embed([text], embed_type="query")[0]
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Embedding query API 失败，降级: %s", exc)
+                logger.warning(f"Embedding query API 失败，降级: {exc}")
                 self._api_failed = True
         return self._hasher.transform([text]).toarray().astype(np.float32)[0]
 

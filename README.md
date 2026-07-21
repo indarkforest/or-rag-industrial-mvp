@@ -1,10 +1,10 @@
-# 工业场景og-rag效果验证 MVP
+# 工业场景or-rag效果验证 MVP
 
 验证目标：**混合检索架构（hybrid-rag）在工业场景下对 Agent 问答效果的提升**。
 
 三种检索方式对照：
 - **naive-rag**：纯向量检索原始文档 chunk
-- **og-rag**：本体驱动检索，事实块 + 图谱扩展 + 实时数据
+- **or-rag**：本体驱动检索，事实块 + 图谱扩展 + 实时数据
 - **hybrid-rag**：混合架构，事实块 + 原文 chunk + 图谱扩展 + 实时数据
 
 实现思路参考 [microsoft/ograg2](https://github.com/microsoft/ograg2)：

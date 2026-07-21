@@ -1,20 +1,34 @@
 """CLI 入口：
 python main.py build            # 构建知识图谱与索引
-python main.py query -q "问题" [-r naive-rag|og-rag]
+python main.py query -q "问题" [-r naive-rag|og-rag|hybrid-rag]
 python main.py eval             # 对照评估，输出 eval_report.md
 """
 import argparse
-import logging
+import sys
+from pathlib import Path
+
+from loguru import logger
 
 from src.agent import QAAgent
 from src.config import load_config, project_path
 from src.evaluate import format_report, run_eval
+from src.exceptions import AppError
 from src.kg_builder import KGBuilder
 from src.llm import EmbeddingClient, LLMClient
 from src.retriever import build_retrievers
 from src.store import GraphStore
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# ── 日志配置 ──
+_LOG_DIR = Path(__file__).resolve().parent / "logs"
+_LOG_DIR.mkdir(parents=True, exist_ok=True)
+logger.remove()
+logger.add(sys.stderr, level="INFO",
+           format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+                  "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+           colorize=True)
+logger.add(str(_LOG_DIR / "app_{time:YYYY-MM-DD}.log"), level="DEBUG",
+           format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}",
+           rotation="00:00", retention="7 days", encoding="utf-8")
 
 
 def main():
@@ -30,10 +44,14 @@ def main():
     sub.add_parser("eval", help="对照评估")
 
     args = parser.parse_args()
-    cfg = load_config()
-    llm = LLMClient(cfg)
-    embedder = EmbeddingClient(cfg)
-    store = GraphStore(cfg["data"]["db_path"])
+    try:
+        cfg = load_config()
+        llm = LLMClient(cfg)
+        embedder = EmbeddingClient(cfg)
+        store = GraphStore(cfg["data"]["db_path"])
+    except AppError as exc:
+        print(f"错误: {exc.user_message}", file=sys.stderr)
+        sys.exit(1)
 
     if args.command == "build":
         stats = KGBuilder(cfg, llm, embedder, store).build()
