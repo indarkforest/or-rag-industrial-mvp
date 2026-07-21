@@ -1,0 +1,28 @@
+# LLM 配置（OpenAI 兼容接口，MiniMax）
+model:
+  base_url: https://api.minimaxi.com/v1
+  # 优先读环境变量 MINIMAX_API_KEY，此处留空即可；也可直接填写（不建议提交到版本库）
+  api_key: ""
+  name: MiniMax-M3
+  temperature: 0.1
+
+# Embedding 配置
+# provider: api    -> 调用 OpenAI 兼容 /embeddings 接口
+# provider: hashing -> 本地 HashingVectorizer（无需外部 API，效果较弱，仅兜底）
+embedding:
+  provider: api
+  base_url: https://api.minimaxi.com/v1
+  api_key: ""
+  name: embo-01
+
+data:
+  docs_dir: data/docs
+  ontology_path: data/ontology/industrial_ontology.jsonld
+  questions_path: data/questions.yaml
+  db_path: data/kg.sqlite
+  chunk_size: 800
+
+retrieval:
+  top_k_chunks: 4      # naive RAG 检索 chunk 数
+  top_k_facts: 6       # OG-RAG 检索事实块数
+  expand_hops: 1       # OG-RAG 图谱扩展跳数

@@ -1,0 +1,100 @@
+{
+  "@context": {
+    "onto": "http://cinaval.com/ontology/industrial#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#"
+  },
+  "@graph": [
+    {
+      "@id": "onto:Device",
+      "@type": "rdfs:Class",
+      "rdfs:label": "设备",
+      "rdfs:comment": "物理设备，如反应釜、泵、阀门、搅拌器、空压站等，通常有位号如 R-101、P-201、TV-101"
+    },
+    {
+      "@id": "onto:Sensor",
+      "@type": "rdfs:Class",
+      "rdfs:label": "测点",
+      "rdfs:comment": "检测仪表/测点，如 TI-101（温度）、FI-102（流量）、PI-101（压力）、SI-101（转速）、ZT-101（阀位）"
+    },
+    {
+      "@id": "onto:ProcessParameter",
+      "@type": "rdfs:Class",
+      "rdfs:label": "工艺参数",
+      "rdfs:comment": "工艺控制指标，包含正常范围、控制指标值，如聚合温度 85±3℃、冷却水流量 18~22 m³/h"
+    },
+    {
+      "@id": "onto:ControlLoop",
+      "@type": "rdfs:Class",
+      "rdfs:label": "控制回路",
+      "rdfs:comment": "控制回路，如 TIC-101，包含被控变量、操纵变量、控制方式与整定参数"
+    },
+    {
+      "@id": "onto:Alarm",
+      "@type": "rdfs:Class",
+      "rdfs:label": "报警/联锁",
+      "rdfs:comment": "报警或联锁项，如 TAH-101、FAL-102、PAL-401，含设定值、优先级、响应时限"
+    },
+    {
+      "@id": "onto:Event",
+      "@type": "rdfs:Class",
+      "rdfs:label": "事件/异常现象",
+      "rdfs:comment": "异常事件或现象，如温度上升、流量下降、阀门开度不足、泵停运、仪表风压力低"
+    },
+    {
+      "@id": "onto:hasSensor",
+      "@type": "rdfs:Property",
+      "rdfs:label": "拥有测点",
+      "rdfs:comment": "设备 -> 测点",
+      "onto:domain": "onto:Device",
+      "onto:range": "onto:Sensor"
+    },
+    {
+      "@id": "onto:monitors",
+      "@type": "rdfs:Property",
+      "rdfs:label": "监测",
+      "rdfs:comment": "测点 -> 工艺参数",
+      "onto:domain": "onto:Sensor",
+      "onto:range": "onto:ProcessParameter"
+    },
+    {
+      "@id": "onto:controls",
+      "@type": "rdfs:Property",
+      "rdfs:label": "控制",
+      "rdfs:comment": "控制回路 -> 设备/工艺参数（操纵对象）",
+      "onto:domain": "onto:ControlLoop",
+      "onto:range": "onto:Device"
+    },
+    {
+      "@id": "onto:triggersAlarm",
+      "@type": "rdfs:Property",
+      "rdfs:label": "触发报警",
+      "rdfs:comment": "测点/事件 -> 报警",
+      "onto:domain": "onto:Event",
+      "onto:range": "onto:Alarm"
+    },
+    {
+      "@id": "onto:causes",
+      "@type": "rdfs:Property",
+      "rdfs:label": "导致",
+      "rdfs:comment": "因果关系：事件/设备故障 -> 事件。这是根因分析的核心关系",
+      "onto:domain": "onto:Event",
+      "onto:range": "onto:Event"
+    },
+    {
+      "@id": "onto:partOf",
+      "@type": "rdfs:Property",
+      "rdfs:label": "属于",
+      "rdfs:comment": "设备 -> 设备/系统/工段的从属关系",
+      "onto:domain": "onto:Device",
+      "onto:range": "onto:Device"
+    },
+    {
+      "@id": "onto:mitigatedBy",
+      "@type": "rdfs:Property",
+      "rdfs:label": "处置措施",
+      "rdfs:comment": "事件/报警 -> 处置措施或联锁动作",
+      "onto:domain": "onto:Event",
+      "onto:range": "onto:Event"
+    }
+  ]
+}
